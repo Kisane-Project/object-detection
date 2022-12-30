@@ -112,19 +112,19 @@ def setup(args):
     cfg.INPUT.MIN_SIZE_TRAIN = args.image_size[1]
     cfg.INPUT.MAX_SIZE_TRAIN = args.image_size[0]
 
-    cfg.DATALOADER.NUM_WORKERS = 4
-    cfg.SOLVER.IMS_PER_BATCH = 2
+    cfg.DATALOADER.NUM_WORKERS = 1
+    cfg.SOLVER.IMS_PER_BATCH = 40
     cfg.SOLVER.BASE_LR = 0.001
 
     cfg.MODEL.ROI_HEADS.NUM_CLASSES = args.num_classes
     cfg.MODEL.ROI_HEADS.BATCH_SIZE_PER_IMAGE = (128)
 
-    cfg.SOLVER.MAX_ITER = 10000
+    cfg.SOLVER.MAX_ITER = 100000
 
-    cfg.SOLVER.CHECKPOINT_PERIOD = 100
-    cfg.TEST.EVAL_PERIOD = 100
+    cfg.SOLVER.CHECKPOINT_PERIOD = 1000
+    cfg.TEST.EVAL_PERIOD = 1000
 
-    cfg.OUTPUT_DIR = f'./ouputs'
+    cfg.OUTPUT_DIR = f'/SSDc/kisane_DB/'
     os.makedirs(cfg.OUTPUT_DIR, exist_ok=True)
 
     cfg.merge_from_list(args.opts)
@@ -141,12 +141,13 @@ def main(args):
         data_mapper = KisanDataMapper(data_dir=dataset_dir, split=d)
         DatasetCatalog.register("kisan_" + d, lambda d=d: data_mapper.data_mapper())
         DatasetCatalog.get("kisan_" + d)
-        MetadataCatalog.get("kisan_" + d).set(thing_classes=data_mapper.create_classes_list())
+        # MetadataCatalog.get("kisan_" + d).set(thing_classes=data_mapper.create_classes_list())
+        MetadataCatalog.get("kisan_" + d).set(thing_classes=['0'])  ### temporary adjust '0'
         if d == "val":
             MetadataCatalog.get("kisan_" + d).evaluator_type = "coco"
 
+    '''check dataset'''
     # kisan_metadata = MetadataCatalog.get("kisan_train")
-    ### check dataset
     # dataset_dicts = data_mapper.data_mapper()
     # for d in random.sample(dataset_dicts, 3):
     #     img = cv2.imread(d["file_name"])
@@ -155,7 +156,8 @@ def main(args):
     #     cv2.imshow("test", vis.get_image()[:, :, ::-1])
     #     cv2.waitKey(0)
 
-    args.num_classes = len(data_mapper.create_classes_list())
+    # args.num_classes = len(data_mapper.create_classes_list())
+    args.num_classes = 1    ### temporary adjust 1
     cfg = setup(args)
 
     print(f"Save logs by Neptune")
@@ -189,16 +191,17 @@ def main(args):
 
 if __name__ == "__main__":
     args = default_argument_parser().parse_args()
-    args.num_gpus = 1
+    args.num_gpus = 5
     args.config_file = "configs/COCO-Detection/faster_rcnn_R_101_DC5_3x.yaml"
     args.image_size = [1280, 720]
+    args.num_machines = 1
 
     print("Command Line Args:", args)
     launch(
         main,
         args.num_gpus,
         num_machines=args.num_machines,
-        # machine_rank=args.machine_rank,
-        # dist_url=args.dist_url,
+        machine_rank=args.machine_rank,
+        dist_url=args.dist_url,
         args=(args,),
     )
