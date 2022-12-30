@@ -116,8 +116,8 @@ def setup(args):
 
     cfg.SOLVER.MAX_ITER = 10000
 
-    cfg.SOLVER.CHECKPOINT_PERIOD = 1000
-    cfg.TEST.EVAL_PERIOD = 1000
+    cfg.SOLVER.CHECKPOINT_PERIOD = 100
+    cfg.TEST.EVAL_PERIOD = 100
 
     cfg.OUTPUT_DIR = f'/home/bak/Projects/kisan/ouputs'
     os.makedirs(cfg.OUTPUT_DIR, exist_ok=True)
@@ -129,9 +129,9 @@ def setup(args):
 
 
 def main(args):
-    dataset_dir = "/home/bak/Projects/kisan/datasets/dataset"
-    train_data_mapper = KisanDataMapper(data_dir=dataset_dir, split='train')
-    test_data_mapper = KisanDataMapper(data_dir=dataset_dir, split='test')
+    dataset_dir = "/home/bak/Projects/Datasets/kisan_sample_data"
+    # train_data_mapper = KisanDataMapper(data_dir=dataset_dir, split='train')
+    # test_data_mapper = KisanDataMapper(data_dir=dataset_dir, split='test')
 
     for d in ["train", "test"]:
         data_mapper = KisanDataMapper(data_dir=dataset_dir, split=d)
