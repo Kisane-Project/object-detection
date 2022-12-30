@@ -121,10 +121,14 @@ class KisanDataMapper:
             # boxes = list(np.array([left, top, right, bottom], dtype=int))
             boxes = list(map(float, [left, top, right, bottom]))
 
+            if int(gt_dirs[idx].split('/')[-6]) >= 1000:
+                category_id = int(gt_dirs[idx].split('/')[-6]) - 870
+            else:
+                category_id = int(gt_dirs[idx].split('/')[-6]) - 1
             obj = {
                 "bbox": boxes,
                 "bbox_mode": BoxMode.XYXY_ABS,
-                "category_id": int(gt_dirs[idx].split('/')[-6]) - 1
+                "category_id": category_id
             }
             objs.append(obj)
             record["annotations"] = objs
