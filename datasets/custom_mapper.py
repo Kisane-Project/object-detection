@@ -87,15 +87,17 @@ class KisanDataMapper:
             print(f'Train dataset size: \t{len(train_idx)}')
             print(f'Test dataset size: \t\t{len(test_idx)}')
 
-            if self.split == 'train':
-                train_dict = self.create_json(train_idx, dataset_list, self.data_dir, self.split)
-            elif self.split == 'test':
-                test_dict = self.create_json(test_idx, dataset_list, self.data_dir, self.split)
+            train_json_dir = os.path.join(self.data_dir, f'kisan_train.json')
+            val_json_dir = os.path.join(self.data_dir, f'kisan_val.json')
+            if not os.path.isfile(train_json_dir):
+                train_dict = self.create_json(train_idx, dataset_list, self.data_dir, 'train')
+            if not os.path.isfile(val_json_dir):
+                val_dict = self.create_json(test_idx, dataset_list, self.data_dir, 'val')
 
             if self.split == 'train':
                 return train_dict
-            elif self.split == 'test':
-                return test_dict
+            elif self.split == 'val':
+                return val_dict
 
     def create_json(self, index_list, dataset_lsit,
                     data_dir, split):
