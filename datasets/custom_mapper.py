@@ -123,6 +123,8 @@ class KisanDataMapper:
 
             if int(gt_dirs[idx].split('/')[-6]) >= 1000:
                 category_id = int(gt_dirs[idx].split('/')[-6]) - 870
+            elif int(gt_dirs[idx].split('/')[-6]) >= 1061:
+                category_id = int(gt_dirs[idx].split('/')[-6]) - 871
             else:
                 category_id = int(gt_dirs[idx].split('/')[-6]) - 1
             obj = {
