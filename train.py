@@ -135,6 +135,7 @@ def setup(args):
 
 def main(args):
     dataset_dir = "/SSDc/kisane_DB/V0_0_1/LI3"
+    # dataset_dir = "/home/bak/Projects/Datasets/kisan_sample_data"
 
     for d in ["train", "val"]:
         data_mapper = KisanDataMapper(data_dir=dataset_dir, split=d)
