@@ -69,7 +69,7 @@ class KisanDataMapper:
                 json.dump(dataset_list, f, indent=4)
 
 
-        json_dir = os.path.join(self.data_dir, f'dataset/kisan_{self.split}.json')
+        json_dir = os.path.join(self.data_dir, f'kisan_{self.split}.json')
         data_dir = os.path.abspath(json_dir)
         if os.path.isfile(data_dir):
             with open(data_dir, 'r') as f:
