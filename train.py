@@ -33,7 +33,12 @@ from detectron2.modeling import GeneralizedRCNNWithTTA
 from detectron2.utils.visualizer import Visualizer
 
 from datasets.custom_mapper import KisanDataMapper
+from tools.logger import Logger
 
+# === add below two lines due to 'urlopen error [SSL: CERTIFICATE_VERIFY_FAILED]' issue ===
+import ssl
+ssl._create_default_https_context = ssl._create_unverified_context
+# =========================================================================================
 
 def build_evaluator(cfg, dataset_name, output_folder=None):
     """
@@ -119,7 +124,7 @@ def setup(args):
     cfg.SOLVER.CHECKPOINT_PERIOD = 100
     cfg.TEST.EVAL_PERIOD = 100
 
-    cfg.OUTPUT_DIR = f'/home/bak/Projects/kisan/ouputs'
+    cfg.OUTPUT_DIR = f'./ouputs'
     os.makedirs(cfg.OUTPUT_DIR, exist_ok=True)
 
     cfg.merge_from_list(args.opts)
@@ -129,15 +134,15 @@ def setup(args):
 
 
 def main(args):
-    dataset_dir = "/home/bak/Projects/Datasets/kisan_sample_data"
-    # train_data_mapper = KisanDataMapper(data_dir=dataset_dir, split='train')
-    # test_data_mapper = KisanDataMapper(data_dir=dataset_dir, split='test')
+    dataset_dir = "/SSDc/kisane_DB/V0_0_1/LI3"
 
-    for d in ["train", "test"]:
+    for d in ["train", "val"]:
         data_mapper = KisanDataMapper(data_dir=dataset_dir, split=d)
         DatasetCatalog.register("kisan_" + d, lambda d=d: data_mapper.data_mapper())
         DatasetCatalog.get("kisan_" + d)
         MetadataCatalog.get("kisan_" + d).set(thing_classes=data_mapper.create_classes_list())
+        if d == "val":
+            MetadataCatalog.get("kisan_" + d).evaluator_type = "coco"
 
     # kisan_metadata = MetadataCatalog.get("kisan_train")
     ### check dataset
@@ -151,6 +156,9 @@ def main(args):
 
     args.num_classes = len(data_mapper.create_classes_list())
     cfg = setup(args)
+
+    print(f"Save logs by Neptune")
+    logger = Logger(cfg, is_neptune=True)
 
     if args.eval_only:
         model = Trainer.build_model(cfg)
@@ -179,7 +187,6 @@ def main(args):
 
 
 if __name__ == "__main__":
-
     args = default_argument_parser().parse_args()
     args.num_gpus = 1
     args.config_file = "configs/COCO-Detection/faster_rcnn_R_101_DC5_3x.yaml"

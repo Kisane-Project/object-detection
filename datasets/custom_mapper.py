@@ -87,8 +87,8 @@ class KisanDataMapper:
             print(f'Train dataset size: \t{len(train_idx)}')
             print(f'Test dataset size: \t\t{len(test_idx)}')
 
-            train_dict = self.create_json(train_idx, dataset_list, self.data_dir, 'train')
-            test_dict = self.create_json(test_idx, dataset_list, self.data_dir, 'test')
+            train_dict = self.create_json(train_idx, dataset_list, self.data_dir, self.split)
+            test_dict = self.create_json(test_idx, dataset_list, self.data_dir, self.split)
 
             if self.split == 'train':
                 return train_dict
