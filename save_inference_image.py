@@ -14,7 +14,6 @@ cfg.OUTPUT_DIR = f'./ouputs'
 
 cfg.DATALOADER.NUM_WORKERS = 2
 
-cfg.MODEL.WEIGHTS = os.path.join(cfg.OUTPUT_DIR, "model_0000199.pth")  # path to the model we just trained
 cfg.MODEL.ROI_HEADS.NUM_CLASSES = 18
 
 # Inference should use the config with parameters that are used in training
@@ -26,7 +25,6 @@ dataset_dir = "/home/bak/Projects/Datasets/kisan_sample_data"
 data_mapper = KisanDataMapper(data_dir=dataset_dir, split='val')
 thing_classes = data_mapper.create_classes_list()
 MetadataCatalog.get("kisan").set(thing_classes=thing_classes)
-
 
 predictor = DefaultPredictor(cfg)
 outputs = predictor(image)
