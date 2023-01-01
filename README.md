@@ -77,7 +77,7 @@ Tested on NVIDIA RTX 3090 with python 3.9, pytorch 1.12.1, torchvision 0.13.1, C
     ```
 2. Check result metric
 - Before start, change `metric_path` and `best_metric` in `./tools/check_metric.py` to your metric path and best metric.
-    - In detectron2, metric path save in `cfg.OUTPUT_DIR` at `train.py`.
+    - In detectron2, result metric saves in `cfg.OUTPUT_DIR` at `train.py`.
     - `best_metric` is a json file that will create after the code execution.
     ```
     python ./tools/check_metric.py
