@@ -1,6 +1,6 @@
 # 기산전자
 
-- Get bounding box of a product in an image
+- Get bounding boxes of a product in an image
 
 <img src="./sample_image/result_sample.png" height="300">
 
