@@ -16,8 +16,8 @@ cfg.OUTPUT_DIR = f'./ouputs'
 
 cfg.DATALOADER.NUM_WORKERS = 2
 
-cfg.MODEL.WEIGHTS = os.path.join(cfg.OUTPUT_DIR, "model_0000199.pth")  # path to the model we just trained
-cfg.MODEL.ROI_HEADS.NUM_CLASSES = 18
+cfg.MODEL.WEIGHTS = os.path.join(cfg.OUTPUT_DIR, "model_0075999.pth")  # path to the model you just trained
+cfg.MODEL.ROI_HEADS.NUM_CLASSES = 1
 
 # Inference should use the config with parameters that are used in training
 # cfg now already contains everything we've set previously. We changed it a little bit for inference:
