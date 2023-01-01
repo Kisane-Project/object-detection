@@ -1,85 +1,87 @@
 # 기산전자
 
-- This is blank template to get started.
-- You can edit this template to suit your needs.
-- It is recommended to include an image in the readme.
-- You can find more awesome README templates from [google](https://www.google.com/search?q=awesome+readme+templates&oq=awe&aqs=chrome.0.69i59j69i57j69i61.1243j0j4&sourceid=chrome&ie=UTF-8)
+- Get bounding box of a product in an image
 
 <img src="./sample_image/result_sample.png" height="300">
-
-
-## Updates & TODO Lists
-- [X] (2022.12.22) README_TEMPLATES.md is released.
-- [ ] Adding more samples.
 
 
 ## Getting Started
 
 ### Environment Setup
 
-Tested on Titan RTX with python 3.7, pytorch 1.8.0, torchvision 0.9.0, CUDA 10.2 / 11.1 and detectron2 v0.5 / v0.6
+Tested on NVIDIA RTX 3090 with python 3.9, pytorch 1.12.1, torchvision 0.13.1, CUDA 11.7 / 11.8 and detectron2 v0.6
 
 1. Install dependencies
-```
-sudo apt update && sudo apt upgrade
-```
+       ```
+       sudo apt update && sudo apt upgrade
+       ```
 
 2. Set up a python environment
-```
-conda create -n test_env python=3.8
-conda activate test_env
-pip install torch torchvision
-python setup.py build develop
-```
+   1. Install [PytTorch](https://pytorch.org/get-started/locally/)
+   - example (below works for above tested environment)
+       ```
+       conda install pytorch torchvision torchaudio pytorch-cuda=11.7 -c pytorch -c nvidia
+       ```
+   2. Create and activate conda environment
+       ```
+       conda create -n kisan_electronics python=3.9
+       conda activate kisan_electronics
+       ```
+   3. Install [Detectron2](https://detectron2.readthedocs.io/en/latest/tutorials/install.html#install-pre-built-detectron2-linux-only)
+   - example of CUDA 11.3 / torch 1.10 (below works for above tested environment)
+       ```
+       python -m pip install detectron2 -f https://dl.fbaipublicfiles.com/detectron2/wheels/cu113/torch1.10/index.html
+       ```
+    4. Install other dependencies
+       ```
+       pip install opencv-python
+       ```
+
 
 ## Train & Evaluation
 
 ### Dataset Preparation
-1. Download `sample dataset' from MAT.
-```
-wget sample_dataset.com
-```
+1. Prepare kisan dataset 
+    ```
+    /원하는 dataset 저장장소/kisane_DB/
+    ```
 
-2. Extract it to `sample folder`
-```
-tar -xvf sample_dataset.tar
-```
+2. Change `cfg.OUTPUT_DIR` in `train.py` to your desired output directory
 
-3. Organize the folders as follows
-```
-test
-├── output
-└── datasets
-       └── sample_dataset
-              └──annotations
-              └──train
-              └──val       
-```
+
+3. Change `dataset_dir` in `main` method in `train.py` to your dataset directory. Just under `dataset_dir` only contains category directories.
+    ```
+    kisane_DB
+        └── V0_0_1
+               └── LI3
+                    └──0001
+                    └──0002
+                    └──0003
+                    ...   
+    ```
 ### Train on sample dataset
-```
-python train_net.py --epoch 100
-```
+- Before train, you should change `args.num_gpus` in `train.py` to your GPU number. Or simply add `--num-gpus 1` in `train.py` command.
+    ```
+    python train_net.py
+    ```
+    or
+    ```
+    python train_net.py --num-gpus 1
+    ```
 
-### Evaluation on test dataset
-```
-python test_net.py --vis_results
-```
-
-## License
-
-The source code of this repository is released only for academic use. See the [license](./LICENSE.md) file for details.
-
-## Notes
-
-Some codes are rewritten from
-- [Best-README-Template](https://github.com/othneildrew/Best-README-Template/edit/master/BLANK_README.md)
-
+### Check inference result
+1. Check result image
+- Before start, change `image_dir` in `save_inference_image.py` to your single image directory.
+    ```
+    python save_inference_image.py
+    ```
+2. Check result metric
+- Before start, change `metric_path` and `best_metric` in `check_metric.py` to your metric path and best metric.
+    - In detectron2, metric path save in `cfg.OUTPUT_DIR` at `train.py`.
+    - `best_metric` is a json file that will create after the code execution.
+    ```
+    python check_metric.py
+    ```
 
 ## Authors
-- **Seunghyeok Back** [seungback](https://github.com/SeungBack)
-
-## License
-Distributed under the MIT License.
-
-## Acknowledgments
-This work was supported by Institute for Information & Communications Technology Promotion(IITP) grant funded by Korea goverment(MSIT) (No.2019-0-01335, Development of AI technology to generate and validate the task plan for assembling furniture in the real and virtual environment by understanding the unstructured multi-modal information from the assembly manual.
+- **Seongho bak**
