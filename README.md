@@ -5,7 +5,7 @@
 - It is recommended to include an image in the readme.
 - You can find more awesome README templates from [google](https://www.google.com/search?q=awesome+readme+templates&oq=awe&aqs=chrome.0.69i59j69i57j69i61.1243j0j4&sourceid=chrome&ie=UTF-8)
 
-<img src="./sample_image/result_sample.png" height="600">
+<img src="./sample_image/result_sample.png" height="300">
 
 
 ## Updates & TODO Lists
