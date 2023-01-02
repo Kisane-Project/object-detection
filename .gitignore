@@ -20,6 +20,7 @@
 detectron2/solver/__pycache__/*
 detectron2/structures/__pycache__/*
 detectron2/utils/__pycache__/*
+/.neptune/*
 
 detectron2/__pycache__/__init__.cpython-39.pyc
 detectron2/checkpoint/__pycache__/__init__.cpython-39.pyc
