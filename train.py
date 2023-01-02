@@ -64,8 +64,6 @@ def build_evaluator(cfg, dataset_name, output_folder=None):
     return DatasetEvaluators(evaluator_list)
 
 
-
-
 class Trainer(DefaultTrainer):
     """
     We use the "DefaultTrainer" which contains pre-defined default logic for
@@ -73,11 +71,6 @@ class Trainer(DefaultTrainer):
     are working on a new research project. In that case you can write your
     own training loop. You can use "tools/plain_train_net.py" as an example.
     """
-    # @classmethod
-    # def build_train_loader(cls, cfg, sampler=None):
-    #     return build_detection_train_loader(
-    #         cfg, mapper=custom_mapper, sampler=sampler
-    #     )
 
     @classmethod
     def build_evaluator(cls, cfg, dataset_name, output_folder=None):
@@ -124,7 +117,7 @@ def setup(args):
     cfg.SOLVER.CHECKPOINT_PERIOD = 1000
     cfg.TEST.EVAL_PERIOD = 1000
 
-    cfg.OUTPUT_DIR = f'/SSDc/kisane_DB/'
+    cfg.OUTPUT_DIR = f'/SSDc/kisane_DB/train_results'
     os.makedirs(cfg.OUTPUT_DIR, exist_ok=True)
 
     cfg.merge_from_list(args.opts)
@@ -141,8 +134,7 @@ def main(args):
         data_mapper = KisanDataMapper(data_dir=dataset_dir, split=d)
         DatasetCatalog.register("kisan_" + d, lambda d=d: data_mapper.data_mapper())
         DatasetCatalog.get("kisan_" + d)
-        # MetadataCatalog.get("kisan_" + d).set(thing_classes=data_mapper.create_classes_list())
-        MetadataCatalog.get("kisan_" + d).set(thing_classes=['0'])  ### temporary adjust '0'
+        MetadataCatalog.get("kisan_" + d).set(thing_classes=data_mapper.create_classes_list())
         if d == "val":
             MetadataCatalog.get("kisan_" + d).evaluator_type = "coco"
 
@@ -155,9 +147,9 @@ def main(args):
     #     vis = visualizer.draw_dataset_dict(d)
     #     cv2.imshow("test", vis.get_image()[:, :, ::-1])
     #     cv2.waitKey(0)
+    '''check dataset'''
 
-    # args.num_classes = len(data_mapper.create_classes_list())
-    args.num_classes = 1    ### temporary adjust 1
+    args.num_classes = len(data_mapper.create_classes_list())
     cfg = setup(args)
 
     print(f"Save logs by Neptune")
