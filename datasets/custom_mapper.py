@@ -13,10 +13,8 @@ class KisanDataMapper:
         self.split = split
         self.dataset_dict = []
         self.data_dir = os.path.abspath(data_dir)
-
-        # self.dataset_path = os.path.join(data_dir, 'dataset')
         self.dataset_path = data_dir
-        # kisan_json = os.path.join(self.dataset_path, f'kisan_{split}.json')
+
         kisan_json = os.path.join(self.data_dir, f'kisan_{split}.json')
         kisan_json = os.path.abspath(kisan_json)
         if os.path.exists(kisan_json) \
@@ -35,9 +33,11 @@ class KisanDataMapper:
 
         entire_list_json = os.path.join(dataset_path, 'kisan_entire_dataset.json')
         if os.path.isfile(entire_list_json):
+            print('Loading entire dataset from json file...')
             with open(entire_list_json, 'r') as f:
                 dataset_list = json.load(f)
         else:
+            print('Creating entire dataset json file...')
             dataset_list = {
                 'rgb_img_dir': [],
                 'gt_dir': [],
@@ -62,8 +62,6 @@ class KisanDataMapper:
                         dataset_list['rgb_img_dir'].append(rgb_dir)
                         dataset_list['gt_dir'].append(gt_dir)
 
-            # with open(entire_list_json, 'w', encoding='utf-8') as f:
-            #     print('create entire dataset json')
 
             with open(entire_list_json, 'w', encoding='utf-8') as f:
                 json.dump(dataset_list, f, indent=4)
@@ -85,14 +83,20 @@ class KisanDataMapper:
             test_idx = np.sort(test_idx)
             print(f'\nEntire dataset size: \t{len(dataset_list["rgb_img_dir"])}')
             print(f'Train dataset size: \t{len(train_idx)}')
-            print(f'Test dataset size: \t\t{len(test_idx)}')
+            print(f'Val dataset size: \t\t{len(test_idx)}')
 
             train_json_dir = os.path.join(self.data_dir, f'kisan_train.json')
             val_json_dir = os.path.join(self.data_dir, f'kisan_val.json')
             if not os.path.isfile(train_json_dir):
+                print('Creating train json file...')
                 train_dict = self.create_json(train_idx, dataset_list, self.data_dir, 'train')
+            else:
+                print('train json file already exists.')
             if not os.path.isfile(val_json_dir):
+                print('Creating val json file...')
                 val_dict = self.create_json(test_idx, dataset_list, self.data_dir, 'val')
+            else:
+                print('val json file already exists.')
 
             if self.split == 'train':
                 return train_dict
@@ -122,16 +126,15 @@ class KisanDataMapper:
             top = bbox_value["Top"][0]
             right = bbox_value["Right"][0]
             bottom = bbox_value["Bottom"][0]
-            # boxes = list(np.array([left, top, right, bottom], dtype=int))
             boxes = list(map(float, [left, top, right, bottom]))
 
-            # if 1000 <= int(gt_dirs[idx].split('/')[-6]) <= 1059:
-            #     category_id = int(gt_dirs[idx].split('/')[-6]) - 870
-            # elif int(gt_dirs[idx].split('/')[-6]) >= 1061:
-            #     category_id = int(gt_dirs[idx].split('/')[-6]) - 871
-            # else:
-            #     category_id = int(gt_dirs[idx].split('/')[-6]) - 1
-            category_id = 0
+            if 1000 <= int(gt_dirs[idx].split('/')[-6]) <= 1059:
+                category_id = int(gt_dirs[idx].split('/')[-6]) - 870
+            elif int(gt_dirs[idx].split('/')[-6]) >= 1061:
+                category_id = int(gt_dirs[idx].split('/')[-6]) - 871
+            else:
+                category_id = int(gt_dirs[idx].split('/')[-6]) - 1
+            # category_id = 0   ### for a single class
             obj = {
                 "bbox": boxes,
                 "bbox_mode": BoxMode.XYXY_ABS,
