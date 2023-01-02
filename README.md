@@ -9,7 +9,7 @@
 
 ### Environment Setup
 
-Tested on NVIDIA RTX 3090 with python 3.9, pytorch 1.12.1, torchvision 0.13.1, CUDA 11.7 / 11.8 and detectron2 v0.6
+Tested on Ubuntu 20.04, NVIDIA RTX 3090 with python 3.9, pytorch 1.12.1, torchvision 0.13.1, CUDA 11.7 / 11.8 and detectron2 v0.6
 
 1. Install dependencies
        ```
