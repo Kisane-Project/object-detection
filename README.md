@@ -43,7 +43,7 @@ Tested on Ubuntu 20.04, NVIDIA RTX 3090 with python 3.9, pytorch 1.12.1, torchvi
 ### Dataset Preparation
 1. Prepare kisan dataset 
     ```
-    /원하는 dataset 저장장소/kisane_DB/
+    /원하는dataset저장장소/kisane_DB/
     ```
 
 2. Change `cfg.OUTPUT_DIR` in `train.py` to your desired output directory
