@@ -14,6 +14,8 @@ class KisanDataMapper:
         self.dataset_dict = []
         self.data_dir = os.path.abspath(data_dir)
         self.dataset_path = data_dir
+        self.missing_data = {}
+        self.missing_index = 0
 
         kisan_json = os.path.join(self.data_dir, f'kisan_{split}.json')
         kisan_json = os.path.abspath(kisan_json)
@@ -53,7 +55,15 @@ class KisanDataMapper:
                         try:
                             rgb_name, depth_name, gt_name = self.search(files, orientation_name, root)
                         except:
-                            print('check')
+                            break
+
+                        if rgb_name is None or gt_name is None:
+                            print('\033[95m' + '[Warning]' + '\033[0m')
+                            print('\033[31m' + f'Check dataset. There are not paired rgb/gt data in '
+                                               f'{root} or other files exist in the folder.' + '\033[0m')
+                            self.missing_data[self.missing_index] = root
+                            self.missing_index += 1
+                            break
 
                         rgb_dir = os.path.join(root, rgb_name)
                         # depth_dir = os.path.join(root, depth_name)
@@ -61,6 +71,11 @@ class KisanDataMapper:
 
                         dataset_list['rgb_img_dir'].append(rgb_dir)
                         dataset_list['gt_dir'].append(gt_dir)
+
+            if 0 in self.missing_data:
+                missing_data_log = self.data_dir + '/missing_data.json'
+                with open(missing_data_log, 'w', encoding='utf-8') as f:
+                    json.dump(self.missing_data, f, indent=4)
 
 
             with open(entire_list_json, 'w', encoding='utf-8') as f:
@@ -102,6 +117,9 @@ class KisanDataMapper:
                 return train_dict
             elif self.split == 'val':
                 return val_dict
+
+        with open(json_dir, 'w', encoding='utf-8') as f:
+            json.dump(self.dataset_dict, f, indent=4)
 
     def create_json(self, index_list, dataset_lsit,
                     data_dir, split):
@@ -153,6 +171,10 @@ class KisanDataMapper:
         return dict
 
     def search(self, files, name, root):
+        rgb_name = None
+        depth_name = None
+        gt_name = None
+
         for item in files:
             if name in item:
                 if 'Color' in item:
@@ -165,7 +187,11 @@ class KisanDataMapper:
         try:
             return rgb_name, depth_name, gt_name
         except:
-            print(f'Check dataset. \nThere is no paired data in {root}')
+            print('\033[95m' + '[Warning]' + '\033[0m')
+            print('\033[31m' + f'There is no data in {root} or other files exist in the folder.' + '\033[0m')
+            # os.path.join(root, files)
+            self.missing_data[self.missing_index] = root
+            return None
 
     def create_classes_list(self):
         class_list = os.listdir(self.data_dir)
@@ -174,7 +200,7 @@ class KisanDataMapper:
 
 
 if __name__ == "__main__":
-    data_mapper = KisanDataMapper(data_dir='.', split='train')
+    data_mapper = KisanDataMapper(data_dir='/home/bak/Projects/Datasets/kisan_sample_data', split='train')
     dataset_dicts = data_mapper.data_mapper()
     class_list = data_mapper.create_classes_list()
     print('done')
