@@ -194,9 +194,11 @@ class KisanDataMapper:
             return None
 
     def create_classes_list(self):
-        class_list = os.listdir(self.data_dir)
-        class_list.sort()
-        return class_list[:-3]  # remove entire, train, test json file
+        # class_list = os.listdir(self.data_dir)
+        # class_list.sort()
+        # return class_list[:-3]  # remove entire, train, test json file
+        ''' Using only one class "0000" '''
+        return ['0000']
 
 
 if __name__ == "__main__":
