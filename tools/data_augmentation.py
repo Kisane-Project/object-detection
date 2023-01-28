@@ -226,10 +226,6 @@ def get_random_augmentation(ann_data, created_data_dir, num_to_create, iou_thres
             for c in range(0, 3):
                 tray_image[y1:y2, x1:x2, c] = (alpha_s * product_img[:, :, c] +
                                                alpha_l * tray_image[y1:y2, x1:x2, c])
-            ### temp check bbox
-            cv2.rectangle(tray_image, (x1, y1), (x2, y2), (0, 255, 0), 2)
-            # cv2.imwrite("sample.png", product_img)
-            ### temp check bbox
 
         created_img_name = f"augmentation_{created_num}.png"
         cv2.imwrite(os.path.join(created_data_dir, created_img_name), tray_image)
@@ -261,6 +257,8 @@ if __name__ == '__main__':
     home_dir = os.path.expanduser('~')
     parser = argparse.ArgumentParser()
 
+    # parser.add_argument('--json_dir', type=str, default=f'/SSDc/kisane_DB/V0_0_1/LI3/kisan_train.json')
+    # parser.add_argument('--created_data_path', type=str, default=f'/SSDc/kisane_DB/kisan_created_data_{yymmdd}')
     parser.add_argument('--json_dir', type=str, default=f'{home_dir}/Datasets/kisan_sample_data/kisan_train.json')
     parser.add_argument('--created_data_path', type=str, default=f'{home_dir}/Datasets/kisan_created_data_{yymmdd}')
     parser.add_argument('--num_to_create', type=int, default=5)
