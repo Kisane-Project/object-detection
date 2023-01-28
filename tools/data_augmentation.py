@@ -1,8 +1,12 @@
-import os, cv2, random, json
+import os, cv2, random, json, argparse, time
 import numpy as np
-from time import time
 from detectron2.structures import BoxMode
+from tqdm import tqdm
 
+global yymmdd
+current_time = time.localtime()
+yymmdd = time.strftime("%Y%m%d", current_time)
+#https://greeksharifa.github.io/references/2021/05/18/time-datetime-usage/
 
 def IoU(box1, box2):
     # box = (x1, y1, x2, y2)
@@ -25,8 +29,18 @@ def IoU(box1, box2):
 
 
 def get_contour_img(data):
-    # get an single image
-    # img0 = data[3326]    # 392, 241, 407, 410, 3326, 2260(잼)
+    '''
+    :param data:
+    :param created_data_dir:
+    :param num_to_create:
+    [description]
+    get a single datum and return a cropped image
+    with transparent background and bounding box information
+
+    :return: cropped transparent image, bbox
+    '''
+
+    # get a single image
     image = cv2.imread(data['file_name'])
 
     # Get the bounding boxes
@@ -53,12 +67,31 @@ def get_contour_img(data):
     grabcut_copy = np.copy(grabcut)
     initial_contours = sorted(contours, key=cv2.contourArea, reverse=True)
     contours = []
+    boundRect = [None] * len(initial_contours)
 
-    for contour in initial_contours:
+    for idx, contour in enumerate(initial_contours):
         area = cv2.contourArea(contour)
         if area > 4800:
-            approx = contour
-            contours.append(approx)
+            boundRect[idx] = cv2.boundingRect(contour)
+            contours.append(contour)
+
+    boundRect = [x for x in boundRect if x is not None]
+    x1 = y1 = x2 = y2 = None
+
+    # get entire bbox
+    for idx, rect in enumerate(boundRect):
+        x, y, w, h = rect
+        if idx == 0:
+            x1, y1, x2, y2 = x, y, x + w, y + h
+        else:
+            x1 = min(x1, x)
+            y1 = min(y1, y)
+            x2 = max(x2, x + w)
+            y2 = max(y2, y + h)
+
+    rect_width = x2 - x1
+    rect_height = y2 - y1
+    bounding_box = np.array([x1, y1, rect_width, rect_height], dtype=np.int32)
 
     contour_mask = cv2.fillPoly(mask, pts=contours, color=(255, 255, 255))
     contour_mask = cv2.merge((contour_mask, contour_mask, contour_mask))
@@ -71,21 +104,27 @@ def get_contour_img(data):
     b, g, r = cv2.split(result)
     rgba = [b, g, r, alpha]
     transparent_result = cv2.merge(rgba, 4)
+    product_image = transparent_result[y1:y1 + rect_height, x1:x1 + rect_width]
 
-    return transparent_result
-def main():
-    json_dir = '/home/bak/Datasets/kisan_sample_data/kisan_train.json'
-    with open(json_dir) as f:
-        data = json.load(f)
+    return product_image, bounding_box
 
-    new_json_dir = '/home/bak/Datasets/kisan_created_data'
-    os.makedirs(new_json_dir, exist_ok=True)
 
-    num_to_create= 5
-    created_images = 0
+def get_random_augmentation(ann_data, created_data_dir, num_to_create, iou_threshold):
+    '''
+    :param ann_data:
+    :param created_data_dir:
+    :param num_to_create:
+    :param iou_threshold:
+    [description]
+    read json file and create new json file with new images
+
+    :return: data with dictionary format
+    '''
+    created_num = 0
 
     # create #(num_to_create) of tray images
-    while created_images < num_to_create:
+    print(f"Creating {num_to_create} images...")
+    while created_num < num_to_create:
         create_num = np.random.randint(2, 5)
         current_dir = os.getcwd()
         tray_images = os.listdir(os.path.join(current_dir, 'tray_image'))
@@ -93,88 +132,140 @@ def main():
         tray_view_point = tray[5]
         tray_image = cv2.imread(os.path.join(current_dir, 'tray_image', tray))
 
-        file_name = f"/home/bak/Projects/Datasets/kisan_created_data/output_image_{created_images}.jpg"
+        file_name = os.path.join(created_data_dir, f"output_image_{created_num}.jpg")
         height, width = tray_image.shape[:2]
 
         record = {}
         record["file_name"] = file_name
-        record["image_id"] = data[-1]['image_id'] + created_images + 1
+        record["image_id"] = ann_data[-1]['image_id'] + created_num + 1
         record["height"] = height
         record["width"] = width
 
         bboxes = []
+        wrong_names = []
 
         # create #(create_num) of product images in a tray image
-        for i in range(create_num):
+        for i in tqdm(range(create_num), desc=f"Creating {created_num} images..."):
             match = False
 
             # get product image same as tray image view point
             while not match:
-                data_num = np.random.randint(len(data))
-                file_path = data[data_num]["file_name"]
+                data_num = np.random.randint(len(ann_data))
+                file_path = ann_data[data_num]["file_name"]
                 image_name = file_path.split('/')[-1]
-                view_point = image_name.split('_')[4][0]
+                try:
+                    view_point = image_name.split('_')[4][0]
+                except:
+                    print('===================')
+                    wrong_names.append(image_name)
+                    with open('wrong_names.txt', 'w') as f:
+                        f.write(wrong_names)
+                    print('===================')
+                    continue
                 # TODO: 모든 파일들에서 viewpoint는 'T2' 와 같은 방식으로 파일 이름에 표기해야 함.
                 if file_path.split('/')[-3] == 'TP5' and view_point == tray_view_point:
                     match = True
 
-
-            product_img = get_contour_img(data[data_num])
+            product_img, bounding_box = get_contour_img(ann_data[data_num])
             # cv2.imwrite("product_img.png", product_img)
 
-            # L 460 140 -> 868 492
-            # R 290 180 -> 690 525
-            # T 350 140 -> 835 510
-            if view_point == 'L':
-                y_offset = np.random.randint(140, 490)
-                x_offset = np.random.randint(460, 860)
-            elif view_point == 'R':
-                y_offset = np.random.randint(180, 520)
-                x_offset = np.random.randint(290, 690)
-            elif view_point == 'T':
-                y_offset = np.random.randint(140, 510)
-                x_offset = np.random.randint(350, 830)
+            # all bbox has IoU under 0.2 each other
+            iou_satisfy = False
+            while not iou_satisfy:
+                ## get random offset
+                # L 460 140 -> 860 490
+                # R 290 180 -> 690 520
+                # T 350 140 -> 830 510
+                if view_point == 'L':
+                    y_offset = np.random.randint(140, 490)
+                    x_offset = np.random.randint(460, 860)
+                elif view_point == 'R':
+                    y_offset = np.random.randint(180, 520)
+                    x_offset = np.random.randint(290, 690)
+                elif view_point == 'T':
+                    y_offset = np.random.randint(140, 510)
+                    x_offset = np.random.randint(350, 830)
 
-            y1, y2 = y_offset, y_offset + product_img.shape[0]
-            x1, x2 = x_offset, x_offset + product_img.shape[1]
+                y1, y2 = y_offset, y_offset + bounding_box[3]
+                x1, x2 = x_offset, x_offset + bounding_box[2]
 
-            if y2 > height:
-                y_difference = (y2 - height + 1)
-                y2 = y2 - y_difference
-                y1 = y1 - y_difference
+                if y2 > height:
+                    y_difference = (y2 - height + 1)
+                    y2 = y2 - y_difference
+                    y1 = y1 - y_difference
 
-            if x2 > width:
-                x_difference = (x2 - width + 1)
-                x2 = x2 - x_difference
-                x1 = x1 - x_difference
+                if x2 > width:
+                    x_difference = (x2 - width + 1)
+                    x2 = x2 - x_difference
+                    x1 = x1 - x_difference
+
+                if not bboxes:
+                    iou_satisfy = True
+                else:   # check IoUs with other bboxes
+                    for bbox_value in bboxes:
+                        iou = IoU(bbox_value['bbox'], [x1, y1, x2, y2])
+                        if iou < iou_threshold:
+                            iou_satisfy = True
+                        else:
+                            print(f"=====IoU: {iou}. Intersection area is too large.====")
+                            iou_satisfy = False
 
             bbox = {
-                'bbox': [x1, y1, x2, y2],
+                'bbox': [int(x1), int(y1), int(x2), int(y2)],
                 'bbox_mode': BoxMode.XYXY_ABS,
                 'category_id': 0
             }
             bboxes.append(bbox)
 
+            # overlay transparent product image on tray image.
+            # https://stackoverflow.com/questions/69620706/overlay-image-on-another-image-with-opencv-and-numpy
+            # https://stackoverflow.com/questions/70295194/overlay-image-on-another-image-opencv
             alpha_s = product_img[:, :, 3] / 255.0
             alpha_l = 1.0 - alpha_s
 
             for c in range(0, 3):
                 tray_image[y1:y2, x1:x2, c] = (alpha_s * product_img[:, :, c] +
                                                alpha_l * tray_image[y1:y2, x1:x2, c])
+            ### temp check bbox
+            cv2.rectangle(tray_image, (x1, y1), (x2, y2), (0, 255, 0), 2)
+            # cv2.imwrite("sample.png", product_img)
+            ### temp check bbox
 
-        created_img_name = f"augmentation_result_{created_images}.png"
-        cv2.imwrite(os.path.join(new_json_dir, created_img_name), tray_image)
+        created_img_name = f"augmentation_{created_num}.png"
+        cv2.imwrite(os.path.join(created_data_dir, created_img_name), tray_image)
         record["annotations"] = bboxes
-        data.append(record)
+        ann_data.append(record)
 
-        created_images += 1
+        print(f"Created a {created_num}th image")
+        created_num += 1
 
-    json_name = 'kisan_train_new.json'
-    with open(os.path.join(new_json_dir, json_name), 'w') as f:
-        json.dump(data, f, indent='\t')
+    return ann_data
+
+def main(original_json, created_data_path, num_to_create, iou_threshold):
+    with open(original_json) as f:
+        ann_data = json.load(f)
+
+    os.makedirs(created_data_path, exist_ok=True)
+
+    new_data = get_random_augmentation(ann_data, created_data_path,
+                                       num_to_create, iou_threshold)
+
+    json_name = f'kisan_train_new_{yymmdd}.json'
+    with open(os.path.join(created_data_path, json_name), 'w') as f:
+        json.dump(new_data, f, indent='\t')
 
     print("Done")
 
 
 if __name__ == '__main__':
-    main()
+    home_dir = os.path.expanduser('~')
+    parser = argparse.ArgumentParser()
+
+    parser.add_argument('--json_dir', type=str, default=f'{home_dir}/Datasets/kisan_sample_data/kisan_train.json')
+    parser.add_argument('--created_data_path', type=str, default=f'{home_dir}/Datasets/kisan_created_data_{yymmdd}')
+    parser.add_argument('--num_to_create', type=int, default=5)
+    parser.add_argument('--iou_threshold', type=float, default=0.1)
+
+    args = parser.parse_args()
+
+    main(args.json_dir, args.created_data_path, args.num_to_create, args.iou_threshold)
