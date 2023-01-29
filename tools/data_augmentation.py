@@ -1,6 +1,6 @@
 import os, cv2, random, json, argparse, time
 import numpy as np
-from detectron2.structures import BoxMode
+# from detectron2.structures import BoxMode
 from tqdm import tqdm
 
 global yymmdd
@@ -122,6 +122,10 @@ def get_random_augmentation(ann_data, created_data_dir, num_to_create, iou_thres
     '''
     created_num = 0
 
+    # there are files which have wrong name
+    wrong_names = {}
+    wrong_name_log = 'wrong_names.json'
+
     # create #(num_to_create) of tray images
     print(f"Creating {num_to_create} images...")
     while created_num < num_to_create:
@@ -142,7 +146,7 @@ def get_random_augmentation(ann_data, created_data_dir, num_to_create, iou_thres
         record["width"] = width
 
         bboxes = []
-        wrong_names = []
+
 
         # create #(create_num) of product images in a tray image
         for i in tqdm(range(create_num), desc=f"Creating {created_num} images..."):
@@ -157,16 +161,24 @@ def get_random_augmentation(ann_data, created_data_dir, num_to_create, iou_thres
                     view_point = image_name.split('_')[4][0]
                 except:
                     print('===================')
+                    wrong_names[i] = image_name
                     wrong_names.append(image_name)
-                    with open('wrong_names.txt', 'w') as f:
-                        f.write(wrong_names)
+                    with open(os.path.join(created_data_dir, wrong_name_log), 'w') as f:
+                        json.dump(wrong_names, f, indent='\t')
                     print('===================')
                     continue
                 # TODO: 모든 파일들에서 viewpoint는 'T2' 와 같은 방식으로 파일 이름에 표기해야 함.
                 if file_path.split('/')[-3] == 'TP5' and view_point == tray_view_point:
                     match = True
 
-            product_img, bounding_box = get_contour_img(ann_data[data_num])
+            try:
+                # TODO: check data....
+                ''' line 92
+                    rect_width = x2 - x1
+                    TypeError: unsupported operand type(s) for -: 'NoneType' and 'NoneType '''
+                product_img, bounding_box = get_contour_img(ann_data[data_num])
+            except:
+                continue
             # cv2.imwrite("product_img.png", product_img)
 
             # all bbox has IoU under 0.2 each other
@@ -212,7 +224,8 @@ def get_random_augmentation(ann_data, created_data_dir, num_to_create, iou_thres
 
             bbox = {
                 'bbox': [int(x1), int(y1), int(x2), int(y2)],
-                'bbox_mode': BoxMode.XYXY_ABS,
+                # 'bbox_mode': BoxMode.XYXY_ABS,
+                'bbox_mode': None,
                 'category_id': 0
             }
             bboxes.append(bbox)
@@ -257,12 +270,12 @@ if __name__ == '__main__':
     home_dir = os.path.expanduser('~')
     parser = argparse.ArgumentParser()
 
-    # parser.add_argument('--json_dir', type=str, default=f'/SSDc/kisane_DB/V0_0_1/LI3/kisan_train.json')
-    # parser.add_argument('--created_data_path', type=str, default=f'/SSDc/kisane_DB/kisan_created_data_{yymmdd}')
-    parser.add_argument('--json_dir', type=str, default=f'{home_dir}/Datasets/kisan_sample_data/kisan_train.json')
-    parser.add_argument('--created_data_path', type=str, default=f'{home_dir}/Datasets/kisan_created_data_{yymmdd}')
-    parser.add_argument('--num_to_create', type=int, default=5)
-    parser.add_argument('--iou_threshold', type=float, default=0.1)
+    parser.add_argument('--json_dir', type=str, default=f'/SSDc/kisane_DB/V0_0_1/LI3/kisan_train.json')
+    parser.add_argument('--created_data_path', type=str, default=f'/SSDc/kisane_DB/kisan_created_data_{yymmdd}')
+    # parser.add_argument('--json_dir', type=str, default=f'{home_dir}/Datasets/kisan_sample_data/kisan_train.json')
+    # parser.add_argument('--created_data_path', type=str, default=f'{home_dir}/Datasets/kisan_created_data_{yymmdd}')
+    parser.add_argument('--num_to_create', type=int, default=30000)
+    parser.add_argument('--iou_threshold', type=float, default=0.15)
 
     args = parser.parse_args()
 
