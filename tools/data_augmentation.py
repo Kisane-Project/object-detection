@@ -121,6 +121,7 @@ def get_random_augmentation(ann_data, created_data_dir, num_to_create, iou_thres
     :return: data with dictionary format
     '''
     created_num = 0
+    original_data = ann_data.copy()
 
     # there are files which have wrong name
     wrong_names = {}
@@ -141,7 +142,7 @@ def get_random_augmentation(ann_data, created_data_dir, num_to_create, iou_thres
 
         record = {}
         record["file_name"] = file_name
-        record["image_id"] = ann_data[-1]['image_id'] + created_num + 1
+        record["image_id"] = original_data[-1]['image_id'] + created_num + 1
         record["height"] = height
         record["width"] = width
 
@@ -154,8 +155,8 @@ def get_random_augmentation(ann_data, created_data_dir, num_to_create, iou_thres
 
             # get product image same as tray image view point
             while not match:
-                data_num = np.random.randint(len(ann_data))
-                file_path = ann_data[data_num]["file_name"]
+                data_num = np.random.randint(len(original_data))
+                file_path = original_data[data_num]["file_name"]
                 image_name = file_path.split('/')[-1]
                 try:
                     view_point = image_name.split('_')[4][0]
@@ -176,7 +177,7 @@ def get_random_augmentation(ann_data, created_data_dir, num_to_create, iou_thres
                 ''' line 92 (at get_contour_img)
                     rect_width = x2 - x1
                     TypeError: unsupported operand type(s) for -: 'NoneType' and 'NoneType '''
-                product_img, bounding_box = get_contour_img(ann_data[data_num])
+                product_img, bounding_box = get_contour_img(original_data[data_num])
             except:
                 continue
             # cv2.imwrite("product_img.png", product_img)
@@ -199,8 +200,6 @@ def get_random_augmentation(ann_data, created_data_dir, num_to_create, iou_thres
 
                 y1, y2 = y_offset, y_offset + bounding_box[3]
                 x1, x2 = x_offset, x_offset + bounding_box[2]
-                print('\n', y1, y2, x1, x2)
-                print(y_offset, y_offset + bounding_box[3], x_offset, x_offset + bounding_box[2])
 
                 if y2 > height:
                     y_difference = (y2 - height + 1)
@@ -238,11 +237,6 @@ def get_random_augmentation(ann_data, created_data_dir, num_to_create, iou_thres
                 alpha_s = product_img[:, :, 3] / 255.0
                 alpha_l = 1.0 - alpha_s
 
-                if product_img.shape[:2] != tray_image[y1:y2, x1:x2, :].shape[:2]:
-                    print('\n')
-                    print(product_img.shape)
-                    print(tray_image[y1:y2, x1:x2, :].shape)
-                    print(f"=====Product image size is not same as tray image size.====")
                 for c in range(0, 3):
                     tray_image[y1:y2, x1:x2, c] = (alpha_s * product_img[:, :, c] +
                                                    alpha_l * tray_image[y1:y2, x1:x2, c])
