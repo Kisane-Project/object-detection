@@ -146,7 +146,7 @@ def get_random_augmentation(ann_data, created_data_dir, num_to_create, iou_thres
         record["width"] = width
 
         bboxes = []
-
+        satisfied_pair = []
 
         # create #(create_num) of product images in a tray image
         for i in tqdm(range(create_num), desc=f"Creating {created_num} images..."):
@@ -161,10 +161,10 @@ def get_random_augmentation(ann_data, created_data_dir, num_to_create, iou_thres
                     view_point = image_name.split('_')[4][0]
                 except:
                     print('===================')
-                    wrong_names[i] = image_name
-                    wrong_names.append(image_name)
+                    wrong_names[created_num] = file_path
                     with open(os.path.join(created_data_dir, wrong_name_log), 'w') as f:
                         json.dump(wrong_names, f, indent='\t')
+                    print(wrong_names)
                     print('===================')
                     continue
                 # TODO: 모든 파일들에서 viewpoint는 'T2' 와 같은 방식으로 파일 이름에 표기해야 함.
@@ -173,7 +173,7 @@ def get_random_augmentation(ann_data, created_data_dir, num_to_create, iou_thres
 
             try:
                 # TODO: check data....
-                ''' line 92
+                ''' line 92 (at get_contour_img)
                     rect_width = x2 - x1
                     TypeError: unsupported operand type(s) for -: 'NoneType' and 'NoneType '''
                 product_img, bounding_box = get_contour_img(ann_data[data_num])
@@ -182,8 +182,7 @@ def get_random_augmentation(ann_data, created_data_dir, num_to_create, iou_thres
             # cv2.imwrite("product_img.png", product_img)
 
             # all bbox has IoU under 0.2 each other
-            iou_satisfy = False
-            while not iou_satisfy:
+            while not len(satisfied_pair) != len(bboxes):
                 ## get random offset
                 # L 460 140 -> 860 490
                 # R 290 180 -> 690 520
@@ -200,6 +199,8 @@ def get_random_augmentation(ann_data, created_data_dir, num_to_create, iou_thres
 
                 y1, y2 = y_offset, y_offset + bounding_box[3]
                 x1, x2 = x_offset, x_offset + bounding_box[2]
+                print('\n', y1, y2, x1, x2)
+                print(y_offset, y_offset + bounding_box[3], x_offset, x_offset + bounding_box[2])
 
                 if y2 > height:
                     y_difference = (y2 - height + 1)
@@ -212,33 +213,39 @@ def get_random_augmentation(ann_data, created_data_dir, num_to_create, iou_thres
                     x1 = x1 - x_difference
 
                 if not bboxes:
-                    iou_satisfy = True
+                    satisfied_pair.append(True)
                 else:   # check IoUs with other bboxes
                     for bbox_value in bboxes:
                         iou = IoU(bbox_value['bbox'], [x1, y1, x2, y2])
                         if iou < iou_threshold:
-                            iou_satisfy = True
+                            satisfied_pair.append(True)
                         else:
                             print(f"=====IoU: {iou}. Intersection area is too large.====")
-                            iou_satisfy = False
+                            continue
 
-            bbox = {
-                'bbox': [int(x1), int(y1), int(x2), int(y2)],
-                # 'bbox_mode': BoxMode.XYXY_ABS,
-                'bbox_mode': None,
-                'category_id': 0
-            }
-            bboxes.append(bbox)
+            if product_img.shape[:2] == tray_image[y1:y2, x1:x2, :].shape[:2]:
+                bbox = {
+                    'bbox': [int(x1), int(y1), int(x2), int(y2)],
+                    # 'bbox_mode': BoxMode.XYXY_ABS,
+                    'bbox_mode': None,
+                    'category_id': 0
+                }
+                bboxes.append(bbox)
 
-            # overlay transparent product image on tray image.
-            # https://stackoverflow.com/questions/69620706/overlay-image-on-another-image-with-opencv-and-numpy
-            # https://stackoverflow.com/questions/70295194/overlay-image-on-another-image-opencv
-            alpha_s = product_img[:, :, 3] / 255.0
-            alpha_l = 1.0 - alpha_s
+                # overlay transparent product image on tray image.
+                # https://stackoverflow.com/questions/69620706/overlay-image-on-another-image-with-opencv-and-numpy
+                # https://stackoverflow.com/questions/70295194/overlay-image-on-another-image-opencv
+                alpha_s = product_img[:, :, 3] / 255.0
+                alpha_l = 1.0 - alpha_s
 
-            for c in range(0, 3):
-                tray_image[y1:y2, x1:x2, c] = (alpha_s * product_img[:, :, c] +
-                                               alpha_l * tray_image[y1:y2, x1:x2, c])
+                if product_img.shape[:2] != tray_image[y1:y2, x1:x2, :].shape[:2]:
+                    print('\n')
+                    print(product_img.shape)
+                    print(tray_image[y1:y2, x1:x2, :].shape)
+                    print(f"=====Product image size is not same as tray image size.====")
+                for c in range(0, 3):
+                    tray_image[y1:y2, x1:x2, c] = (alpha_s * product_img[:, :, c] +
+                                                   alpha_l * tray_image[y1:y2, x1:x2, c])
 
         created_img_name = f"augmentation_{created_num}.png"
         cv2.imwrite(os.path.join(created_data_dir, created_img_name), tray_image)
@@ -270,11 +277,11 @@ if __name__ == '__main__':
     home_dir = os.path.expanduser('~')
     parser = argparse.ArgumentParser()
 
-    parser.add_argument('--json_dir', type=str, default=f'/SSDc/kisane_DB/V0_0_1/LI3/kisan_train.json')
-    parser.add_argument('--created_data_path', type=str, default=f'/SSDc/kisane_DB/kisan_created_data_{yymmdd}')
-    # parser.add_argument('--json_dir', type=str, default=f'{home_dir}/Datasets/kisan_sample_data/kisan_train.json')
-    # parser.add_argument('--created_data_path', type=str, default=f'{home_dir}/Datasets/kisan_created_data_{yymmdd}')
-    parser.add_argument('--num_to_create', type=int, default=30000)
+    # parser.add_argument('--json_dir', type=str, default=f'/SSDc/kisane_DB/V0_0_1/LI3/kisan_train.json')
+    # parser.add_argument('--created_data_path', type=str, default=f'/SSDc/kisane_DB/kisan_created_data_{yymmdd}')
+    parser.add_argument('--json_dir', type=str, default=f'{home_dir}/Datasets/kisan_sample_data/kisan_train.json')
+    parser.add_argument('--created_data_path', type=str, default=f'{home_dir}/Datasets/kisan_created_data_{yymmdd}')
+    parser.add_argument('--num_to_create', type=int, default=10)
     parser.add_argument('--iou_threshold', type=float, default=0.15)
 
     args = parser.parse_args()
