@@ -122,6 +122,8 @@ def get_random_augmentation(ann_data, created_data_dir, num_to_create, iou_thres
     '''
     created_num = 0
     original_data = ann_data.copy()
+    larger_iou = 0.4
+    threshold_appeared = 0
 
     # there are files which have wrong name
     wrong_names = {}
@@ -180,7 +182,7 @@ def get_random_augmentation(ann_data, created_data_dir, num_to_create, iou_thres
                 product_img, bounding_box = get_contour_img(original_data[data_num])
             except:
                 continue
-            # cv2.imwrite("product_img.png", product_img)
+            cv2.imwrite(f"{created_num}_{i}_product_img.png", product_img)
 
             # all bbox has IoU under 0.2 each other
             while not len(satisfied_pair) != len(bboxes):
@@ -218,8 +220,11 @@ def get_random_augmentation(ann_data, created_data_dir, num_to_create, iou_thres
                         iou = IoU(bbox_value['bbox'], [x1, y1, x2, y2])
                         if iou < iou_threshold:
                             satisfied_pair.append(True)
+                        elif iou < larger_iou and threshold_appeared > 9:
+                            satisfied_pair.append(True)
                         else:
                             print(f"=====IoU: {iou}. Intersection area is too large.====")
+                            threshold_appeared += 1
                             continue
 
             if product_img.shape[:2] == tray_image[y1:y2, x1:x2, :].shape[:2]:
