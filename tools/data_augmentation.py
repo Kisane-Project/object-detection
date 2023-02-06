@@ -230,8 +230,7 @@ def get_random_augmentation(ann_data, created_data_dir, num_to_create, iou_thres
             if product_img.shape[:2] == tray_image[y1:y2, x1:x2, :].shape[:2]:
                 bbox = {
                     'bbox': [int(x1), int(y1), int(x2), int(y2)],
-                    # 'bbox_mode': BoxMode.XYXY_ABS,
-                    'bbox_mode': None,
+                    'bbox_mode': 0, # BoxMode.XYXY_ABS is equal to 0
                     'category_id': 0
                 }
                 bboxes.append(bbox)
