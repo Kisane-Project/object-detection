@@ -1,3 +1,4 @@
+*.pyc
 /ouputs/
 /tools/__pycache__/*
 /detectron2/utils/__pycache__/*
@@ -17,9 +18,9 @@
 /detectron2/modeling/meta_arch/__pycache__/*
 /detectron2/modeling/proposal_generator/__pycache__/*
 /detectron2/modeling/roi_heads/__pycache__/*
-detectron2/solver/__pycache__/*
-detectron2/structures/__pycache__/*
-detectron2/utils/__pycache__/*
+/detectron2/solver/__pycache__/*
+/detectron2/structures/__pycache__/*
+/detectron2/utils/__pycache__/*
 /.neptune/*
 
 detectron2/__pycache__/*
