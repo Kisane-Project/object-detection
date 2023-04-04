@@ -29,3 +29,5 @@ work_dirs/
 result/
 datasets/kisane2coco/images/
 mvdet/datasets/sample
+
+!dataset/samples/*/*.png

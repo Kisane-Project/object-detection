@@ -84,7 +84,7 @@ Tested on Ubuntu 18.04, NVIDIA RTX 3090 with python 3.9, pytorch 1.11.0, torchvi
 
 
 ### Train
-    - single-gpu training
+- single-gpu training
     ```bash
     # Code
     CUDA_VISIBLE_DEVICES=<사용할 GPU ID> python train.py \
@@ -99,7 +99,7 @@ Tested on Ubuntu 18.04, NVIDIA RTX 3090 with python 3.9, pytorch 1.11.0, torchvi
                                     --work-dir result/kisane/sparse_rcnn_r101_fpn_300_proposals_crop_mstrain_480-800_3x_coco
     ```
 
-    - multi-gpu training
+- multi-gpu training
     ```bash
     # Code
     CUDA_VISIBLE_DEVICES=<사용할 GPU ID> python -m torch.distributed.launch \
@@ -110,7 +110,7 @@ Tested on Ubuntu 18.04, NVIDIA RTX 3090 with python 3.9, pytorch 1.11.0, torchvi
                                         --seed 0 \
                                         --work-dir result/<저장할 위치> \
                                         --launcher pytorch
-    
+
     # Example (4 GPU)
     CUDA_VISIBLE_DEVICES=0,1,2,3 python -m torch.distributed.launch \
                                         --nproc_per_node=4 \
@@ -124,16 +124,22 @@ Tested on Ubuntu 18.04, NVIDIA RTX 3090 with python 3.9, pytorch 1.11.0, torchvi
 
 
 ### Check inference result
+- After training finished,
+    - configure_path = <save-directory>/~.py
+    - checkpoint_path = <save-directory>/epoch_#.pth
+
 - Make Inference
-```
+    ```bash
+        python inference.py --data_path <data_path> --config_path <configure_path> --checkpoint_path <checkpoint_path> --gpu_id <gpu id> --save_dir <save directory>
 
+        # Example 1: inference for directory (containing *.jpg, *.png)
+        python inference.py --data_path dataset/samples/0001 --config_path result/kisane/sparse_rcnn_r101_fpn_300_proposals_crop_mstrain_480-800_3x_coco.py \
+                            --checkpoint_path result/kisane/epoch_36.pth --gpu_id 0 --save_dir visualization/
 
-```
-
-
-
-
-
+        # Example 2: inference for single image
+        python inference.py --data_path dataset/samples/0001/V0_0_1_123622270639_R2_FOV090_ANG20_MIL500_LI3_TRAY2_BR_LY_TP1_TO045_G04-0005_20230110_111409_Color.png \
+                            --config_path result/kisane/sparse_rcnn_r101_fpn_300_proposals_crop_mstrain_480-800_3x_coco.py \
+                            --checkpoint_path result/kisane/epoch_36.pth --gpu_id 0 --save_dir visualization/
 
 
 

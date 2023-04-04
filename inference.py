@@ -12,6 +12,8 @@ from mmdet.datasets.pipelines import Compose
 import mvdet 
 from glob import glob
 import numpy as np
+from utils.nms import nms
+
 
 def parse_args():
     parser = argparse.ArgumentParser(
@@ -19,7 +21,6 @@ def parse_args():
     parser.add_argument('--config_path', default='result/kisane/sparse_rcnn_r101_fpn_300_proposals_crop_mstrain_480-800_3x_coco/sparse_rcnn_r101_fpn_300_proposals_crop_mstrain_480-800_3x_coco.py', help='test config file path')
     parser.add_argument('--checkpoint_path', default='result/kisane/sparse_rcnn_r101_fpn_300_proposals_crop_mstrain_480-800_3x_coco/epoch_4.pth', help='checkpoint_path /.pth format')
     parser.add_argument('--seed', default=0, help='seed number')
-    # parser.add_argument('--data_path', default='mvdet/datasets/sample', help='data path for single image or directory containing multiple images (format: .jpg or .png)')
     parser.add_argument('--data_path', default='/SSDe/kisane_DB/kisane_DB_v0_3/multi_data/G04-1015/TRAY2/DR/TP4/TO270', help='data path for single image or directory containing multiple images (format: .jpg or .png)')
     parser.add_argument('--gpu_id', default=1, type=int)
     parser.add_argument('--save_dir', default='visualization/', type=str)
@@ -131,7 +132,9 @@ if __name__=='__main__':
         # Inference
         results = make_inference(model, dataset)
         bbox_result = results[0][results[0][:, 4] > args.threshold]
-    
+        selected_indices = nms(bbox_result[:, :4], bbox_result[:, 4], overlap_threshold=0.5)
+        bbox_result = bbox_result[selected_indices]
+            
         # Visualization
         np.save(os.path.join(args.save_dir, os.path.basename(img).replace('.png', '.npy')), bbox_result) # save bbox
         show_result_pyplot(model,
