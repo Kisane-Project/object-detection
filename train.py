@@ -1,199 +1,260 @@
-#!/usr/bin/env python
-# Copyright (c) Facebook, Inc. and its affiliates.
-"""
-A main training script.
+# Copyright (c) OpenMMLab. All rights reserved.
+import argparse
+import copy
+import os
+os.chdir(os.path.dirname(os.path.abspath(__file__)))
 
-This scripts reads a given config file and runs the training or evaluation.
-It is an entry point that is made to train standard models in detectron2.
+import os.path as osp
+import time
+import warnings
 
-In order to let one script support training of many models,
-this script contains logic that are specific to these built-in models and therefore
-may not be suitable for your own project.
-For example, your research project perhaps only needs a single "evaluator".
-
-Therefore, we recommend you to use detectron2 as an library and take
-this file as an example of how to use the library.
-You may want to write your own script with your datasets and other customizations.
-"""
-
-import logging
-import os, cv2, random
-from collections import OrderedDict
-
-import detectron2.utils.comm as comm
-from detectron2 import model_zoo
-from detectron2.checkpoint import DetectionCheckpointer
-from detectron2.config import get_cfg
-from detectron2.data import MetadataCatalog, DatasetCatalog
-from detectron2.data import build_detection_train_loader
-from detectron2.data.datasets import register_coco_instances, load_coco_json
-from detectron2.engine import DefaultTrainer, default_argument_parser, default_setup, hooks, launch
-from detectron2.evaluation import (COCOEvaluator, DatasetEvaluators, verify_results)
-from detectron2.modeling import GeneralizedRCNNWithTTA
-from detectron2.utils.visualizer import Visualizer
-
-from datasets.custom_mapper import KisanDataMapper
-from tools.logger import Logger
-
-# === add below two lines due to 'urlopen error [SSL: CERTIFICATE_VERIFY_FAILED]' issue ===
-import ssl
-ssl._create_default_https_context = ssl._create_unverified_context
-# =========================================================================================
-
-def build_evaluator(cfg, dataset_name, output_folder=None):
-    """
-    Create evaluator(s) for a given dataset.
-    This uses the special metadata "evaluator_type" associated with each builtin dataset.
-    For your own dataset, you can simply create an evaluator manually in your
-    script and do not have to worry about the hacky if-else logic here.
-    """
-    if output_folder is None:
-        output_folder = os.path.join(cfg.OUTPUT_DIR, "inference")
-    evaluator_list = []
-    evaluator_type = MetadataCatalog.get(dataset_name).evaluator_type
-
-    # evaluator_type : "coco"
-    evaluator_list.append(COCOEvaluator(dataset_name, output_dir=output_folder))
-
-    if len(evaluator_list) == 0:
-        raise NotImplementedError(
-            "no Evaluator for the dataset {} with the type {}".format(dataset_name, evaluator_type)
-        )
-    elif len(evaluator_list) == 1:
-        return evaluator_list[0]
-    return DatasetEvaluators(evaluator_list)
+import mmcv
+import torch
+import torch.distributed as dist
+from mmcv import Config, DictAction
+from mmcv.runner import get_dist_info, init_dist
+from mmcv.utils import get_git_hash
+from mmdet import __version__
+from mmdet.apis import init_random_seed, set_random_seed, train_detector
+from mmdet.datasets import build_dataset
+from mmdet.models import build_detector
+from mmdet.utils import (collect_env, get_device, get_root_logger,
+                         replace_cfg_vals, rfnext_init_model,
+                         setup_multi_processes, update_data_root)
+import mvdet
 
 
-class Trainer(DefaultTrainer):
-    """
-    We use the "DefaultTrainer" which contains pre-defined default logic for
-    standard training workflow. They may not work for you, especially if you
-    are working on a new research project. In that case you can write your
-    own training loop. You can use "tools/plain_train_net.py" as an example.
-    """
+def parse_args():
+    parser = argparse.ArgumentParser(description='Train a detector')
+    parser.add_argument('--config', default='configs/faster_rcnn_kd/coco_faster_rcnn_r50_c4_1x_fskd.py', type=str, help='train config file path')
+    parser.add_argument('--work-dir', help='the dir to save logs and models')
+    parser.add_argument(
+        '--resume-from', help='the checkpoint file to resume from')
+    parser.add_argument(
+        '--auto-resume',
+        action='store_true',
+        help='resume from the latest checkpoint automatically')
+    parser.add_argument(
+        '--no-validate',
+        action='store_true',
+        help='whether not to evaluate the checkpoint during training')
+    group_gpus = parser.add_mutually_exclusive_group()
+    group_gpus.add_argument(
+        '--gpus',
+        type=int,
+        help='(Deprecated, please use --gpu-id) number of gpus to use '
+        '(only applicable to non-distributed training)')
+    group_gpus.add_argument(
+        '--gpu-ids',
+        type=int,
+        nargs='+',
+        help='(Deprecated, please use --gpu-id) ids of gpus to use '
+        '(only applicable to non-distributed training)')
+    group_gpus.add_argument(
+        '--gpu-id',
+        type=int,
+        help='id of gpu to use '
+        '(only applicable to non-distributed training)')
+    parser.add_argument('--seed', type=int, default=None, help='random seed')
+    parser.add_argument(
+        '--diff-seed',
+        action='store_true',
+        help='Whether or not set different seeds for different ranks')
+    parser.add_argument(
+        '--deterministic',
+        action='store_true',
+        help='whether to set deterministic options for CUDNN backend.')
+    parser.add_argument(
+        '--options',
+        nargs='+',
+        action=DictAction,
+        help='override some settings in the used config, the key-value pair '
+        'in xxx=yyy format will be merged into config file (deprecate), '
+        'change to --cfg-options instead.')
+    parser.add_argument(
+        '--cfg-options',
+        nargs='+',
+        action=DictAction,
+        help='override some settings in the used config, the key-value pair '
+        'in xxx=yyy format will be merged into config file. If the value to '
+        'be overwritten is a list, it should be like key="[a,b]" or key=a,b '
+        'It also allows nested list/tuple values, e.g. key="[(a,b),(c,d)]" '
+        'Note that the quotation marks are necessary and that no white space '
+        'is allowed.')
+    parser.add_argument(
+        '--launcher',
+        choices=['none', 'pytorch', 'slurm', 'mpi'],
+        default='none',
+        help='job launcher')
+    parser.add_argument('--local_rank', type=int, default=0)
+    parser.add_argument(
+        '--auto-scale-lr',
+        action='store_true',
+        help='enable automatically scaling LR.')
+    args = parser.parse_args()
+    if 'LOCAL_RANK' not in os.environ:
+        os.environ['LOCAL_RANK'] = str(args.local_rank)
 
-    @classmethod
-    def build_evaluator(cls, cfg, dataset_name, output_folder=None):
-        return build_evaluator(cfg, dataset_name, output_folder)
+    if args.options and args.cfg_options:
+        raise ValueError(
+            '--options and --cfg-options cannot be both '
+            'specified, --options is deprecated in favor of --cfg-options')
+    if args.options:
+        warnings.warn('--options is deprecated in favor of --cfg-options')
+        args.cfg_options = args.options
 
-    @classmethod
-    def test_with_TTA(cls, cfg, model):
-        logger = logging.getLogger("detectron2.trainer")
-        # In the end of training, run an evaluation with TTA
-        # Only support some R-CNN models.
-        logger.info("Running inference with test-time augmentation ...")
-        model = GeneralizedRCNNWithTTA(cfg, model)
-        evaluators = [
-            cls.build_evaluator(
-                cfg, name, output_folder=os.path.join(cfg.OUTPUT_DIR, "inference_TTA")
-            )
-            for name in cfg.DATASETS.TEST
-        ]
-        res = cls.test(cfg, model, evaluators)
-        res = OrderedDict({k + "_TTA": v for k, v in res.items()})
-        return res
-
-
-def setup(args):
-    """
-    Create configs and perform basic setups.
-    """
-    cfg = get_cfg()
-    cfg.merge_from_file(args.config_file)
-    cfg.DATASETS.TRAIN = ("kisan_train",)
-    cfg.DATASETS.TEST = ("kisan_val",)
-    cfg.INPUT.MIN_SIZE_TRAIN = args.image_size[1]
-    cfg.INPUT.MAX_SIZE_TRAIN = args.image_size[0]
-
-    cfg.DATALOADER.NUM_WORKERS = 1
-    cfg.SOLVER.IMS_PER_BATCH = 40
-    cfg.SOLVER.BASE_LR = 0.001
-
-    cfg.MODEL.ROI_HEADS.NUM_CLASSES = args.num_classes
-    cfg.MODEL.ROI_HEADS.BATCH_SIZE_PER_IMAGE = (128)
-
-    cfg.SOLVER.MAX_ITER = 100000
-
-    cfg.SOLVER.CHECKPOINT_PERIOD = 1000
-    cfg.TEST.EVAL_PERIOD = 1000
-
-    cfg.OUTPUT_DIR = f'/SSDc/kisane_DB/train_results'
-    os.makedirs(cfg.OUTPUT_DIR, exist_ok=True)
-
-    cfg.merge_from_list(args.opts)
-    cfg.freeze()
-    default_setup(cfg, args)
-    return cfg
-
-
-def main(args):
-    dataset_dir = "/SSDc/kisane_DB/V0_0_1/LI3"
-    # dataset_dir = "/home/bak/Projects/Datasets/kisan_sample_data"
-
-    for d in ["train", "val"]:
-        data_mapper = KisanDataMapper(data_dir=dataset_dir, split=d)
-        DatasetCatalog.register("kisan_" + d, lambda d=d: data_mapper.data_mapper())
-        DatasetCatalog.get("kisan_" + d)
-        MetadataCatalog.get("kisan_" + d).set(thing_classes=data_mapper.create_classes_list())
-        if d == "val":
-            MetadataCatalog.get("kisan_" + d).evaluator_type = "coco"
-
-    '''check dataset'''
-    # kisan_metadata = MetadataCatalog.get("kisan_train")
-    # dataset_dicts = data_mapper.data_mapper()
-    # for d in random.sample(dataset_dicts, 3):
-    #     img = cv2.imread(d["file_name"])
-    #     visualizer = Visualizer(img[:, :, ::-1], metadata=kisan_metadata, scale=0.5)
-    #     vis = visualizer.draw_dataset_dict(d)
-    #     cv2.imshow("test", vis.get_image()[:, :, ::-1])
-    #     cv2.waitKey(0)
-    '''check dataset'''
-
-    args.num_classes = len(data_mapper.create_classes_list())
-    cfg = setup(args)
-
-    print(f"Save logs by Neptune")
-    logger = Logger(cfg, is_neptune=True)
-
-    if args.eval_only:
-        model = Trainer.build_model(cfg)
-        DetectionCheckpointer(model, save_dir=cfg.OUTPUT_DIR).resume_or_load(
-            cfg.MODEL.WEIGHTS, resume=args.resume
-        )
-        res = Trainer.test(cfg, model)
-        if cfg.TEST.AUG.ENABLED:
-            res.update(Trainer.test_with_TTA(cfg, model))
-        if comm.is_main_process():
-            verify_results(cfg, res)
-        return res
-
-    """
-    If you'd like to do anything fancier than the standard training logic,
-    consider writing your own training loop (see plain_train_net.py) or
-    subclassing the trainer.
-    """
-    trainer = Trainer(cfg)
-    trainer.resume_or_load(resume=args.resume)
-    if cfg.TEST.AUG.ENABLED:
-        trainer.register_hooks(
-            [hooks.EvalHook(0, lambda: trainer.test_with_TTA(cfg, trainer.model))]
-        )
-    return trainer.train()
+    return args
 
 
-if __name__ == "__main__":
-    args = default_argument_parser().parse_args()
-    args.num_gpus = 5
-    args.config_file = "configs/COCO-Detection/faster_rcnn_R_101_DC5_3x.yaml"
-    args.image_size = [1280, 720]
-    args.num_machines = 1
+def main():
+    args = parse_args()
+    # # # temporary setting for debug
+    # args.config = 'configs/sparse_rcnn_kd/coco_sparse_rcnn_r50_fpn_mstrain_480-800_3x_fskd.py'
+    # args.work_dir = 'result/coco/debugging'
+    # args.seed = 0
+    # args.gpu_id = 0
 
-    print("Command Line Args:", args)
-    launch(
-        main,
-        args.num_gpus,
-        num_machines=args.num_machines,
-        machine_rank=args.machine_rank,
-        dist_url=args.dist_url,
-        args=(args,),
-    )
+    cfg = Config.fromfile(args.config)
+
+    # replace the ${key} with the value of cfg.key
+    cfg = replace_cfg_vals(cfg)
+
+    # update data root according to MMDET_DATASETS
+    update_data_root(cfg)
+
+    if args.cfg_options is not None:
+        cfg.merge_from_dict(args.cfg_options)
+
+    if args.auto_scale_lr:
+        if 'auto_scale_lr' in cfg and \
+                'enable' in cfg.auto_scale_lr and \
+                'base_batch_size' in cfg.auto_scale_lr:
+            cfg.auto_scale_lr.enable = True
+        else:
+            warnings.warn('Can not find "auto_scale_lr" or '
+                          '"auto_scale_lr.enable" or '
+                          '"auto_scale_lr.base_batch_size" in your'
+                          ' configuration file. Please update all the '
+                          'configuration files to mmdet >= 2.24.1.')
+
+    # set multi-process settings
+    setup_multi_processes(cfg)
+
+    # set cudnn_benchmark
+    if cfg.get('cudnn_benchmark', False):
+        torch.backends.cudnn.benchmark = True
+
+    # work_dir is determined in this priority: CLI > segment in file > filename
+    if args.work_dir is not None:
+        # update configs according to CLI args if args.work_dir is not None
+        cfg.work_dir = args.work_dir
+    elif cfg.get('work_dir', None) is None:
+        # use config filename as default work_dir if cfg.work_dir is None
+        cfg.work_dir = osp.join('./work_dirs',
+                                osp.splitext(osp.basename(args.config))[0])
+
+    if args.resume_from is not None:
+        cfg.resume_from = args.resume_from
+    cfg.auto_resume = args.auto_resume
+    if args.gpus is not None:
+        cfg.gpu_ids = range(1)
+        warnings.warn('`--gpus` is deprecated because we only support '
+                      'single GPU mode in non-distributed training. '
+                      'Use `gpus=1` now.')
+    if args.gpu_ids is not None:
+        cfg.gpu_ids = args.gpu_ids[0:1]
+        warnings.warn('`--gpu-ids` is deprecated, please use `--gpu-id`. '
+                      'Because we only support single GPU mode in '
+                      'non-distributed training. Use the first GPU '
+                      'in `gpu_ids` now.')
+    if args.gpus is None and args.gpu_ids is None:
+        cfg.gpu_ids = [args.gpu_id]
+
+    # init distributed env first, since logger depends on the dist info.
+    if args.launcher == 'none':
+        distributed = False
+    else:
+        distributed = True
+        init_dist(args.launcher, **cfg.dist_params)
+        # re-set gpu_ids with distributed training mode
+        _, world_size = get_dist_info()
+        cfg.gpu_ids = range(world_size)
+
+    # create work_dir
+    mmcv.mkdir_or_exist(osp.abspath(cfg.work_dir))
+    # dump config
+    cfg.dump(osp.join(cfg.work_dir, osp.basename(args.config)))
+    # init the logger before other steps
+    timestamp = time.strftime('%Y%m%d_%H%M%S', time.localtime())
+    log_file = osp.join(cfg.work_dir, f'{timestamp}.log')
+    logger = get_root_logger(log_file=log_file, log_level=cfg.log_level)
+
+    # init the meta dict to record some important information such as
+    # environment info and seed, which will be logged
+    meta = dict()
+    # log env info
+    env_info_dict = collect_env()
+    env_info = '\n'.join([(f'{k}: {v}') for k, v in env_info_dict.items()])
+    dash_line = '-' * 60 + '\n'
+    logger.info('Environment info:\n' + dash_line + env_info + '\n' +
+                dash_line)
+    meta['env_info'] = env_info
+    meta['config'] = cfg.pretty_text
+    # log some basic info
+    logger.info(f'Distributed training: {distributed}')
+    logger.info(f'Config:\n{cfg.pretty_text}')
+
+    cfg.device = get_device()
+    # set random seeds
+    seed = init_random_seed(args.seed, device=cfg.device)
+    seed = seed + dist.get_rank() if args.diff_seed else seed
+    logger.info(f'Set random seed to {seed}, '
+                f'deterministic: {args.deterministic}')
+    set_random_seed(seed, deterministic=args.deterministic)
+    cfg.seed = seed
+    meta['seed'] = seed
+    meta['exp_name'] = osp.basename(args.config)
+
+
+    # Load Model
+    model = build_detector(
+        cfg.model,
+        train_cfg=cfg.get('train_cfg'),
+        test_cfg=cfg.get('test_cfg'))
+    model.init_weights()
+
+
+    # init rfnext if 'RFSearchHook' is defined in cfg
+    rfnext_init_model(model, cfg=cfg)
+
+    datasets = [build_dataset(cfg.data.train)]
+    if len(cfg.workflow) == 2:
+        assert 'val' in [mode for (mode, _) in cfg.workflow]
+        val_dataset = copy.deepcopy(cfg.data.val)
+        val_dataset.pipeline = cfg.data.train.get(
+            'pipeline', cfg.data.train.dataset.get('pipeline'))
+        datasets.append(build_dataset(val_dataset))
+        
+    if cfg.checkpoint_config is not None:
+        # save mmdet version, config file content and class names in
+        # checkpoints as meta data
+        cfg.checkpoint_config.meta = dict(
+            mmdet_version=__version__ + get_git_hash()[:7],
+            CLASSES=datasets[0].CLASSES)
+        
+    # add an attribute for visualization convenience
+    model.CLASSES = datasets[0].CLASSES
+    
+    train_detector(
+        model,
+        datasets,
+        cfg,
+        distributed=distributed,
+        validate=(not args.no_validate),
+        timestamp=timestamp,
+        meta=meta)
+
+
+if __name__ == '__main__':
+    main()
+    exit()

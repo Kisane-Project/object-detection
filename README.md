@@ -1,87 +1,141 @@
-# 기산전자
-
-- Get bounding boxes of a product in an image
-
-<img src="./sample_image/result_sample.png" height="300">
-
 
 ## Getting Started
 
 ### Environment Setup
-
-Tested on Ubuntu 20.04, NVIDIA RTX 3090 with python 3.9, pytorch 1.12.1, torchvision 0.13.1, CUDA 11.7 / 11.8 and detectron2 v0.6
-
+Tested on Ubuntu 18.04, NVIDIA RTX 3090 with python 3.9, pytorch 1.11.0, torchvision 0.12.0, CUDA 11.7 and mmdetection 2.26.0
 1. Install dependencies
        ```
        sudo apt update && sudo apt upgrade
        ```
 
 2. Set up a python environment
-   1. Install [PytTorch](https://pytorch.org/get-started/locally/)
-   - example (below works for above tested environment)
-       ```
-       conda install pytorch torchvision torchaudio pytorch-cuda=11.7 -c pytorch -c nvidia
-       ```
-   2. Create and activate conda environment
-       ```
-       conda create -n kisan_electronics python=3.9
-       conda activate kisan_electronics
-       ```
-   3. Install [Detectron2](https://detectron2.readthedocs.io/en/latest/tutorials/install.html#install-pre-built-detectron2-linux-only)
-   - example of CUDA 11.3 / torch 1.10 (below works for above tested environment)
-       ```
-       python -m pip install detectron2 -f https://dl.fbaipublicfiles.com/detectron2/wheels/cu113/torch1.10/index.html
-       ```
+    1. Create and activate conda environment
+        ```bash
+        conda create -n kisane python=3.9
+        conda activate kisane
+        ```
+
+    2. Install [PytTorch](https://pytorch.org/get-started/locally/)
+        - example (below works for above tested environment)
+        ```bash
+        conda install pytorch=1.11.0 torchvision=0.12.0 pytorch-cuda=11.7 -c pytorch -c nvidia
+        ```
+
+    3. Install [MMdetection](https://mmdetection.readthedocs.io/en/stable/get_started.html)
+        - Install MMCV using MIM.
+        ```bash
+        pip install -U openmim
+        mim install mmcv-full
+        ```
+
+        -  Install MMDetection
+        ```bash
+        git clone https://github.com/open-mmlab/mmdetection.git
+        cd mmdetection
+        pip install -v -e .
+        ```
+
     4. Install other dependencies
-       ```
+       ```bash
        pip install opencv-python
+       pip install tqdm
        ```
-
-
-## Train & Evaluation
 
 ### Dataset Preparation
 1. Prepare kisan dataset 
     ```
-    /원하는dataset저장장소/kisane_DB/
-    ```
+    <datafolder>/kisane_DB
+        └── Calibration Sheet
+            └── V0_0_1_123622270639_R2_FOV090_ANG20_MIL500_LI3_TRAY1_CA_LY_TP1_TO000_Cal_Sheet_20221128_115329_Color.png
+            └── V0_0_1_123622270639_R2_FOV090_ANG20_MIL500_LI3_TRAY1_CA_LY_TP1_TO000_Cal_Sheet_20221128_115329_Depth.png
+            └── V0_0_1_123622270639_R2_FOV090_ANG20_MIL500_LI3_TRAY1_CA_LY_TP1_TO000_Cal_Sheet_20221128_115329.txt
+            ...
 
-2. Change `cfg.OUTPUT_DIR` in `train.py` to your desired output directory
+        └── multi_data
+            └── G04-0001
+            └── G04-0002
+            └── G04-0003
+            ...
 
-
-3. Change `dataset_dir` in `main` method in `train.py` to your dataset directory. Just under `dataset_dir` only contains category directories.
-    ```
-    kisane_DB
-        └── V0_0_1
-               └── LI3
+        └── single_data
+            └── LI3
                     └──0001
                     └──0002
                     └──0003
                     ...   
     ```
-### Train on sample dataset
-- Before train, you should change `args.num_gpus` in `train.py` to your GPU number. Or simply add `--num-gpus 1` in `train.py` command.
+
+2. Softlink the dataset folder into current directory
+    ```bash
+    ln -s <kisane_DB directory> ./dataset/
+    # ln -s /SSDe/kisane_DB ./dataset/
     ```
-    python train_net.py
+
+3. Augmentation
+    ```bash
+    python mvdet/augmentation/extract_patch.py # generate single patch
+    python mvdet/augmentation/multi_augmentation.py # augmentation
     ```
-    or
+
+4. Convert dataset file into COCO type
+    ```bash
+    python mvdet/datasets/kisane2coco.py
     ```
-    python train_net.py --num-gpus 1
+
+
+### Train
+    - single-gpu training
+    ```bash
+    # Code
+    CUDA_VISIBLE_DEVICES=<사용할 GPU ID> python train.py \
+                                --config configs/<사용할 configure path> \
+                                --seed 0 \
+                                --work-dir result/<저장할 위치>
+
+    # Example
+    CUDA_VISIBLE_DEVICES=0 python train.py \
+                                    --config configs/sparse_rcnn/sparse_rcnn_r101_fpn_300_proposals_crop_mstrain_480-800_3x_coco.py \
+                                    --seed 0 \
+                                    --work-dir result/kisane/sparse_rcnn_r101_fpn_300_proposals_crop_mstrain_480-800_3x_coco
     ```
+
+    - multi-gpu training
+    ```bash
+    # Code
+    CUDA_VISIBLE_DEVICES=<사용할 GPU ID> python -m torch.distributed.launch \
+                                        --nproc_per_node=<GPU 개수> \
+                                        --master_port=<PORT 번호> \
+                                        train.py \
+                                        --config configs/<사용할 configure> \
+                                        --seed 0 \
+                                        --work-dir result/<저장할 위치> \
+                                        --launcher pytorch
+    
+    # Example (4 GPU)
+    CUDA_VISIBLE_DEVICES=0,1,2,3 python -m torch.distributed.launch \
+                                        --nproc_per_node=4 \
+                                        --master_port=100 \
+                                        train.py \
+                                        --config configs/sparse_rcnn/sparse_rcnn_r101_fpn_300_proposals_crop_mstrain_480-800_3x_coco.py \
+                                        --seed 0 \
+                                        --work-dir result/kisane/sparse_rcnn_r101_fpn_300_proposals_crop_mstrain_480-800_3x_coco \
+                                        --launcher pytorch
+    ```
+
 
 ### Check inference result
-1. Check result image
-- Before start, change `image_dir` in `save_inference_image.py` to your single image directory.
-    ```
-    python save_inference_image.py
-    ```
-2. Check result metric
-- Before start, change `metric_path` and `best_metric` in `./tools/check_metric.py` to your metric path and best metric.
-    - In detectron2, result metric saves in `cfg.OUTPUT_DIR` at `train.py`.
-    - `best_metric` is a json file that will create after the code execution.
-    ```
-    python ./tools/check_metric.py
-    ```
+- Make Inference
+```
+
+
+```
+
+
+
+
+
+
+
 
 ## Authors
-- **Seongho bak**
+- **Sungho Shin**
