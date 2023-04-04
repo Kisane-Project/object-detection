@@ -140,17 +140,20 @@ Tested on Ubuntu 18.04, NVIDIA RTX 3090 with python 3.9, pytorch 1.11.0, torchvi
         ```
 
 - Make Inference
+       DET_CONFIG_PATH = kisane_model_ckpt/det_checkpoint/sparse_rcnn/sparse_rcnn_r101_fpn_300_proposals_crop_mstrain_480-800_3x_coco.py
+       DET_CKPT_PATH = kisane_model_ckpt/det_checkpoint/sparse_rcnn/sparse_rcnn_r101_fpn_300_proposals_crop_mstrain_480-800_3x_coco/epoch_36.pth
+
     ```bash
         python inference.py --data_path <data_path> --config_path <configure_path> --checkpoint_path <checkpoint_path> --gpu_id <gpu id> --save_dir <save directory>
 
         # Example 1: inference for directory (containing *.jpg, *.png)
-        python inference.py --data_path dataset/samples/0001 --config_path result/kisane/sparse_rcnn_r101_fpn_300_proposals_crop_mstrain_480-800_3x_coco.py \
-                            --checkpoint_path result/kisane/epoch_36.pth --gpu_id 0 --save_dir visualization/
+        python inference.py --data_path dataset/samples/0001 --config_path $DET_CONFIG_PATH \
+                            --checkpoint_path $DET_CKPT_PATH --gpu_id 0 --save_dir visualization/
 
         # Example 2: inference for single image
         python inference.py --data_path dataset/samples/0001/V0_0_1_123622270639_R2_FOV090_ANG20_MIL500_LI3_TRAY2_BR_LY_TP1_TO045_G04-0005_20230110_111409_Color.png \
-                            --config_path result/kisane/sparse_rcnn_r101_fpn_300_proposals_crop_mstrain_480-800_3x_coco.py \
-                            --checkpoint_path result/kisane/epoch_36.pth --gpu_id 0 --save_dir visualization/
+                            --config_path $DET_CONFIG_PATH \
+                            --checkpoint_path $DET_CKPT_PATH --gpu_id 0 --save_dir visualization/
 
 
 
