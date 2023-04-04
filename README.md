@@ -127,11 +127,17 @@ Tested on Ubuntu 18.04, NVIDIA RTX 3090 with python 3.9, pytorch 1.11.0, torchvi
 
 ### Check inference result
 - After training finished,
-    - configure_path = <save-directory>/~.py
-    - checkpoint_path = <save-directory>/epoch_#.pth
+    - configure_path = <detection-save-directory>/~.py
+    - checkpoint_path = <detection-save-directory>/epoch_#.pth
 
 - Pretrained Models
-    - [Sparse RCNN (R101, 300 proposals, mstrain, 3x)]()
+    - [kisane_model_ckpt directory](http://gofile.me/6VGIB/9NViYYMFz)
+        ```bash
+        - det_checkpoint/
+            - sparse_rcnn/
+                - ~.py  # config
+                - ~.pth # weight
+        ```
 
 - Make Inference
     ```bash
