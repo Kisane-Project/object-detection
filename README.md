@@ -43,7 +43,9 @@ Tested on Ubuntu 18.04, NVIDIA RTX 3090 with python 3.9, pytorch 1.11.0, torchvi
 
 ### Dataset Preparation
 1. Prepare kisan dataset 
-    ```
+    ```bash
+    'kisane_DB_v0_3 같이 버전 컨트롤 폴더는 일반성을 위해 제거하고 바로 kisane_DB 폴더 아래 데이터들을 위치시켰습니다.'
+    
     <datafolder>/kisane_DB
         └── Calibration Sheet
             └── V0_0_1_123622270639_R2_FOV090_ANG20_MIL500_LI3_TRAY1_CA_LY_TP1_TO000_Cal_Sheet_20221128_115329_Color.png
