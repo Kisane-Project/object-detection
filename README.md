@@ -130,6 +130,9 @@ Tested on Ubuntu 18.04, NVIDIA RTX 3090 with python 3.9, pytorch 1.11.0, torchvi
     - configure_path = <save-directory>/~.py
     - checkpoint_path = <save-directory>/epoch_#.pth
 
+- Pretrained Models
+    - [Sparse RCNN (R101, 300 proposals, mstrain, 3x)]()
+
 - Make Inference
     ```bash
         python inference.py --data_path <data_path> --config_path <configure_path> --checkpoint_path <checkpoint_path> --gpu_id <gpu id> --save_dir <save directory>
